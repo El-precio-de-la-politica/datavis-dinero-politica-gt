@@ -5,7 +5,7 @@
   "main": "index.js",
   "dependencies": {
     "papaparse": "^5.1.0",
-    "phaser": "^3.19.0"
+    "phaser": "3.19.0"
   },
   "devDependencies": {
     "@babel/core": "^7.4.5",
