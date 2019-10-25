@@ -3,22 +3,22 @@ import { Blur } from "./graphics/blur"
 import Papa from "papaparse"
 
 var data = {
-  orig_largo: 175, 
-  orig_ancho: 82, 
-  orig_grosor: 0.17,
-  draw_scale: 0.35,
+  orig_largo: 202, 
+  orig_ancho: 85, 
+  orig_grosor: 35/100,
+  draw_scale: 0.30,
   dx_A: 51/0.3,
   dy_A: 24/0.3,
   dx_B: 70/0.3,
   dy_B: 12/0.3,
-
+  block_z_offset: 15, 
   minZoom: 0.2,
   maxZoom: 1.5
   
 }
 
-data["iso_angle_x"] = Math.tan(0.22);
-data["iso_angle_y"] = Math.tan(0.53);
+data["iso_angle_x"] = Math.tan(0.45);
+data["iso_angle_y"] = Math.tan(0.42);
 data["iso_basis_y"] = new Phaser.Math.Vector2(Math.sin(data.iso_angle_x), -Math.sin(data.iso_angle_y));
 data["iso_basis_x"] = new Phaser.Math.Vector2(Math.cos(data.iso_angle_x), Math.cos(data.iso_angle_y));
 
@@ -62,72 +62,38 @@ var utils = {
 }
 function CuboDeDinero(N, scene, x, y) {
     
-    var v        =     data.orig_ancho*data.orig_grosor*data.orig_largo, 
-        V        =     N*v, 
+    var v        =     data.orig_ancho*data.orig_grosor*data.orig_largo*100, 
+        V        =     (N/10000)*v, 
         pre_x    = Math.pow(V, 1/3) / data.orig_largo,
         final_x  = Math.max(1, Math.ceil(pre_x)),
         pre_y    = Math.sqrt( V / (data.orig_largo * final_x) )/data.orig_ancho,
         final_y  = Math.max(1, Math.ceil(pre_y)),
-        final_z  = Math.ceil(V/(data.orig_grosor * final_x * data.orig_largo * final_y * data.orig_ancho)) ;
+        final_z  = Math.ceil(V/(data.orig_grosor * 100 * final_x * data.orig_largo * final_y * data.orig_ancho)) ;
+    
     var ix =0, iy = 0;
+    
     iy = -data.iso_basis_y.dot(new Phaser.Math.Vector2(0, (final_y-1)*data.orig_ancho*data.draw_scale));
-    var alto  = iy + final_z*data.orig_grosor*data.draw_scale + data.iso_basis_y.dot(new Phaser.Math.Vector2((final_x+1)*data.orig_largo*data.draw_scale, 0)) + 5; 
+    
+    var alto  = iy + final_z*data.orig_grosor*100*data.draw_scale + data.iso_basis_y.dot(new Phaser.Math.Vector2((final_x+1)*data.orig_largo*data.draw_scale, 0)) + 5; 
     var ancho = data.iso_basis_x.dot(new Phaser.Math.Vector2((final_x)*data.orig_largo*data.draw_scale, (final_y)*data.orig_ancho*data.draw_scale)); 
     this.gameObject = new Phaser.GameObjects.RenderTexture(scene, x, y, ancho, alto);
     this.graphics = scene.add.graphics().setVisible(false);
 
-    this.graphics.setTexture("billete_lado");
-    this.graphics.fillStyle(0xdadb5e, 1);
-
     this.render = function () {
         for (var x = 1; x <= final_x; x++) {
-            for (var y = 1; y <= final_y; y++) {
-                var xyvector = new Phaser.Math.Vector2((x-1)*data.orig_largo*data.draw_scale,  (y-1)*data.orig_ancho*data.draw_scale);
-                var ty = iy + data.iso_basis_y.dot(xyvector);
-                var tx = ix + data.iso_basis_x.dot(xyvector);
-                
-                if (y==1) { 
-                    var draw_z = final_z * data.orig_grosor * data.draw_scale;
-                    for (var z=1; z<draw_z-2; z++) {
-                        this.graphics.lineStyle(1, utils.rnd.pick([0xcec89d, 0xf5dfd1, 0xe5cf81]), 1);
-                        this.graphics.lineBetween(tx, ty+data.dy_B*data.draw_scale+z+1,tx+data.dx_A*data.draw_scale, ty+data.dy_A*data.draw_scale+z+1);
-                    }
-                    if (x!=final_x) {
-                        this.graphics.lineStyle(2, 0x553515, 1);
-                        this.graphics.lineBetween(tx+data.dx_A*data.draw_scale, ty+data.dy_A*data.draw_scale,tx+data.dx_A*data.draw_scale, ty+data.dy_A*data.draw_scale+draw_z-2);
-                        //this.graphics.lineBetween(tx+52, ty+24,tx+71, ty+12);
-                    }
-                    
-                }
-                
-                if (x==final_x) { 
-                    // this.graphics.fillStyle(0xaa8b6e, 1);
-                    var draw_z = final_z * data.orig_grosor * data.draw_scale;
-                    for (var z=1; z<draw_z-1; z++) {
-                        this.graphics.lineStyle(2, utils.rnd.pick([0xcec89d-0x333333, 0xf5dfd1-0x333333, 0xe5cf81-0x333333]), 1);
-                        this.graphics.lineBetween(tx+data.dx_A*data.draw_scale, 
-                                                  ty+data.dy_A*data.draw_scale+z+1,
-                                                  tx+data.dx_B*data.draw_scale, 
-                                                  ty+data.dy_B*data.draw_scale+z+1);
-                    }
-                    /*this.graphics.beginPath();  
-                    this.graphics.moveTo(tx+data.dx_A*data.draw_scale, ty+data.dy_A*data.draw_scale+1);
-                    this.graphics.lineTo(tx+data.dx_B*data.draw_scale, ty+data.dy_B*data.draw_scale+1);
-                    this.graphics.lineTo(tx+data.dx_B*data.draw_scale, ty+data.dy_B*data.draw_scale+draw_z);
-                    this.graphics.lineTo(tx+data.dx_A*data.draw_scale, ty+data.dy_A*data.draw_scale+draw_z);
-
-                    this.graphics.closePath();
-                    this.graphics.fillPath();*/
-                    if ( y<final_y) {
-                        this.graphics.lineStyle(2, 0x553515, 1);
-                        this.graphics.lineBetween(tx+data.dx_B*data.draw_scale + 1, ty+data.dy_B*data.draw_scale,tx+data.dx_B*data.draw_scale + 1, ty+data.dy_B*data.draw_scale+draw_z-2);
-                        //this.graphics.lineBetween(tx+52, ty+24,tx+71, ty+12);
+            for (var y = final_y; y >= 1; y--) {
+                for (var z = final_z; z >= 1; z--) {
+                    // empty box
+                    if (z==1 || y==1 || x==final_x)  {
+                        var xyvector = new Phaser.Math.Vector2((x-1)*data.orig_largo*data.draw_scale, 
+                                                              (y-1)*data.orig_ancho*data.draw_scale);
+                        var ty = iy + data.iso_basis_y.dot(xyvector) + z*data.orig_grosor*100*data.draw_scale, 
+                            tx = ix + data.iso_basis_x.dot(xyvector);
+                        
+                        this.gameObject .draw(
+                            assets.Q10000, tx, ty);
                     }
                 }
-                
-                this.gameObject .draw(
-                    assets.billete, tx, ty);
-
             }
         } 
         this.gameObject .draw(this.graphics);
@@ -144,7 +110,7 @@ function PlotDineros(dineros, scene) {
       this.container = scene.add.container([],0,0);
       var that = this;
       this.montones =  dineros.map(function (d, i) {
-          var monton = new CuboDeDinero(d.value/100, scene, 0, 0);
+          var monton = new CuboDeDinero(d.value, scene, 0, 0);
           if (prevMonton != null) {
               monton.gameObject.x = prevMonton.gameObject.x + Math.max(300, prevMonton.gameObject.width*0.75)  + 100;
               monton.gameObject.y = prevMonton.gameObject.y + prevMonton.gameObject.height*1.15 - monton.gameObject.height;
@@ -164,7 +130,7 @@ function PlotDineros(dineros, scene) {
             scene, 
             monton.gameObject.x + monton.gameObject.width/2,
             monton.gameObject.y - 50, // + monton.gameObject.height,
-            "Q" + utils.formatMoney(Math.floor(d.value)), 
+            d.partido + "\nQ" + utils.formatMoney(Math.floor(d.value)), 
             utils.labelStyle
           );
           monton.label.setOrigin(0,0);
@@ -172,7 +138,7 @@ function PlotDineros(dineros, scene) {
             scene,
             monton.label.x-50,
             monton.gameObject.y - 40, //+ monton.gameObject.height,
-            'logo_dummy'
+            d.logo_ref
           );
           monton.logo.setDisplaySize(100,100);
           that.container.add([monton.logo, monton.gameObject, monton.label]);
@@ -209,9 +175,13 @@ function loader() {
 
     function preload ()
     {
-        this.load.image('billete', 'assets/billete100_iso.png');
-        this.load.image('billete_lado', 'assets/billete_lado.png');
-        this.load.image('logo_dummy', 'assets/logo.png');
+        this.load.image('billete100', 'assets/Assets/Q100_Iso.png');
+        this.load.image('billete10000', 'assets/Assets/Q100_Block.png');
+        
+        var partidos = "Partidos_ADN, Partidos_FCN, Partidos_MI PAIS, Partidos_UNE, Partidos_VAMOS, Partidos_ANN, Partidos_FRG, Partidos_PAN, Partidos_UNIONISTA, Partidos_VICTORIA, Partidos_CREO, Partidos_LIDER, Partidos_PATRIOTA, Partidos_URNG, Partidos_WINAQ"
+        partidos.split(", ").forEach( (partido)=> {
+            this.load.image(partido, 'assets/Partidos/' + partido + '.png');
+        });
         this._utils = {};
         this._utils.pipeline = this.game.renderer.addPipeline('Blur', new Blur(this.game));
         this._utils.pipeline .setFloat1('resolution', 2000);
@@ -223,9 +193,10 @@ function loader() {
     function create ()
     {
         scene = this;
-        console.log(this.game.renderer);
-        assets.billete = this.add.image(100, 100, "billete");
-        assets.billete.setVisible(false).setScale(data.draw_scale).setOrigin(0,0);
+        assets.Q100 = this.add.image(100, 100, "billete100");
+        assets.Q100.setVisible(false).setScale(0.3).setOrigin(0,0);
+        assets.Q10000 = this.add.image(100, 100, "billete10000");
+        assets.Q10000.setVisible(false).setScale(0.28).setOrigin(0,0);
 
         var database = Papa.parse("gte_financiamiento.csv", {
             download: true,
@@ -237,7 +208,7 @@ function loader() {
 //         this.cameras.main.setRenderToTexture(this._utils.pipeline);
         
         data.scrolling = false;
-        /*
+        
         scene.input.on('pointerdown', function(pointer){
             data.scrolling = true;
             data.scrollingOrigin = {x: pointer.x, y: pointer.y, camx: scene.cameras.main.scrollX, camy: scene.cameras.main.scrollY};
@@ -263,11 +234,24 @@ function loader() {
                 newZoom = data.maxZoom;
             scene.cameras.main.setZoom(newZoom);
         });
-        */
+        
     }
     
     function update ()
     {
+    }
+    
+    
+    var _partidosAbbr = {
+        "Patriota": "PATRIOTA",
+        "Líder": "LIDER",
+        "Lider": "LIDER",
+        "URNG MAIZ": "URNG",
+        "Winaq": "WINAQ",
+        "Victoria": "VICTORIA"
+    };
+    function partidosAbbr(inputStr) {
+        return _partidosAbbr[inputStr] || inputStr;
     }
     
     function setDatabase(database) {
@@ -282,11 +266,16 @@ function loader() {
                 aggMain[periodo] = {};
             }
             if (aggMain[periodo][row[4]]  === undefined) {
-                aggMain[periodo][row[4]] =  { value: 0, id: row[4] };
+                aggMain[periodo][row[4]] =  { 
+                    value: 0, 
+                    id: row[4],
+                    logo_ref: "Partidos_" + partidosAbbr(row[4]),
+                    partido: row[4]
+                };
             }
             aggMain[periodo][row[4]].value += parseFloat(row[3]) || 0;
         });
-        
+        console.log(aggMain);
         // Plot
         var years =  Object.getOwnPropertyNames(aggMain).map(function (d) {
             return {
@@ -319,11 +308,11 @@ function loader() {
                 
                 plot.container.y = -bounds.height;
                 plot.label = new Phaser.GameObjects.Text(
-                  scene, 
-                  bounds.width / 2,
-                  bounds.height + 50, // + monton.gameObject.height,
-                  yearsLabels[d.id], 
-                  utils.titleStyle
+                    scene, 
+                    bounds.width / 2,
+                    bounds.height + 50, // + monton.gameObject.height,
+                    yearsLabels[d.id], 
+                    utils.titleStyle
                 );
                 plot.label.setOrigin(0.5,0);
                 plot.container.add(plot.label);
@@ -333,10 +322,8 @@ function loader() {
                 
                 // recalcular los bounds
                 bounds = plot.container.getBounds();
-                console.log(bounds);
                 plot.container.setInteractive(new Phaser.Geom.Rectangle(0, 0, bounds.width, bounds.height), Phaser.Geom.Rectangle.Contains);
                 plot.container.on("pointerdown", function (pointer) {
-                    console.log("clicked", plot, d, selYear);
                     if (selYear == d.id) {
                         selYear = null;
                         resetViewport(true);
@@ -357,11 +344,18 @@ function loader() {
         function resetViewport(ease) {
             if (ease) {
                 scene.cameras.main.pan(totalWidth/2+500, -maxHeight/2 + 200 + 500, 400, Phaser.Math.Easing.Linear.In, true);
-                scene.cameras.main.zoomTo(0.75*viewport.width/totalWidth, 400, Phaser.Math.Easing.Circular.Out, true);
+                scene.cameras.main.zoomTo(Math.min(0.75*viewport.width/totalWidth,
+                                                   0.75*viewport.height/(maxHeight+300),
+                                                   0.5
+                                               ),
+                                                   400, Phaser.Math.Easing.Circular.Out, true);
             }
             else {
                 scene.cameras.main.setScroll(totalWidth/2, -maxHeight/2 + 200);
-                scene.cameras.main.setZoom(0.75*viewport.width/totalWidth);
+                scene.cameras.main.setZoom(Math.min(0.75*viewport.width/totalWidth,
+                                                   0.75*viewport.height/(2*maxHeight + 300),
+                                                    0.5
+                                               ));
             }
         }
         
@@ -369,7 +363,6 @@ function loader() {
     }
     
     var vis = new Phaser.Game(config);
-    console.log(vis);
     return vis;
 }
 
