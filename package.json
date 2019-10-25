@@ -24,7 +24,7 @@
     "webpack-dev-server": "^3.7.2"
   },
   "scripts": {
-    "serve": "webpack-dev-server --mode development",
+    "serve": "webpack-dev-server -d --mode development",
     "clean": "rm -rf dist",
     "build": "npm run clean && webpack --mode production"
   },

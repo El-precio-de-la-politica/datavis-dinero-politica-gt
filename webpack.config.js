@@ -19,7 +19,7 @@ module.exports = {
            new UglifyJSPlugin({
                include: /\.js$/,
                parallel: true,
-               sourceMap: false,
+               sourceMap: true,
                uglifyOptions: {
                    compress: true,
                    ie8: false,
