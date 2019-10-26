@@ -1,8 +1,10 @@
 import Phaser from 'phaser'
 import { Blur } from "./graphics/blur"
-import Papa from "papaparse"
 
 var data = {
+  viewport: {
+      width: 1000, height: 1000
+  },
   orig_largo: 202, 
   orig_ancho: 85, 
   orig_grosor: 35/100,
@@ -12,8 +14,8 @@ var data = {
   dx_B: 70/0.3,
   dy_B: 12/0.3,
   block_z_offset: 15, 
-  minZoom: 0.2,
-  maxZoom: 1.5
+  minZoom: 0.1,
+  maxZoom: 1.3
   
 }
 
@@ -24,23 +26,34 @@ data["iso_basis_x"] = new Phaser.Math.Vector2(Math.cos(data.iso_angle_x), Math.c
 
 var utils = {
     rnd: new Phaser.Math.RandomDataGenerator(0),
+    yearsLabels: {
+        0: "2007",
+        1: "2011",
+        2: "2015"
+    },
     labelStyle: {
-        font: '300 25px Rubik',
+        font: '300 40px Rubik',
         fontWeight: "300",
-        color: '#000000',
-        backgroundColor: '#ffffff',
+        color: '#CC888F',
+        shadow: {
+        },
+        padding: {x: 20, y: 10}
+    },
+    labelSelStyle: {
+        font: '300 45px Rubik',
+        color: '#660025',
         shadow: {
             color: '#666666',
             fill: true,
             offsetX: 0,
             offsetY: 0,
-            blur: 2
+            blur: 5
         },
         padding: {x: 20, y: 10}
     },
     titleStyle: {
-        font: '500 200px Rubik',
-        color: '#000000',
+        font: '500 100px Rubik',
+        color: '#dddddd',
         backgroundColor: '#ffffff',
         padding: {x: 20, y: 10}
     },
@@ -85,8 +98,8 @@ function CuboDeDinero(N, scene, x, y) {
                 for (var z = final_z; z >= 1; z--) {
                     // empty box
                     if (z==1 || y==1 || x==final_x)  {
-                        var xyvector = new Phaser.Math.Vector2((x-1)*data.orig_largo*data.draw_scale, 
-                                                              (y-1)*data.orig_ancho*data.draw_scale);
+                        var xyvector = new Phaser.Math.Vector2((x-1)*data.orig_largo*data.draw_scale + Math.random()*4-2, 
+                                                              (y-1)*data.orig_ancho*data.draw_scale  + Math.random()*4-2);
                         var ty = iy + data.iso_basis_y.dot(xyvector) + z*data.orig_grosor*100*data.draw_scale, 
                             tx = ix + data.iso_basis_x.dot(xyvector);
                         
@@ -109,15 +122,16 @@ function PlotDineros(dineros, scene) {
       var firstCol = null;
       this.container = scene.add.container([],0,0);
       var that = this;
-      this.montones =  dineros.map(function (d, i) {
+      this.data = dineros;
+      this.montones =  dineros.data.map(function (d, i) {
           var monton = new CuboDeDinero(d.value, scene, 0, 0);
           if (prevMonton != null) {
-              monton.gameObject.x = prevMonton.gameObject.x + Math.max(300, prevMonton.gameObject.width*0.75)  + 100;
+              monton.gameObject.x = prevMonton.gameObject.x + Math.max(400, prevMonton.gameObject.width*0.75)  + 100;
               monton.gameObject.y = prevMonton.gameObject.y + prevMonton.gameObject.height*1.15 - monton.gameObject.height;
           }
           if (i%4 == 0 && prevMonton) {
               monton.gameObject.x = 50*i/4;
-              monton.gameObject.y = firstCol.gameObject.y+firstCol.gameObject.height+100;
+              monton.gameObject.y = firstCol.gameObject.y+firstCol.gameObject.height+200;
               firstCol = monton;
           }
           if (i==0) {
@@ -129,22 +143,85 @@ function PlotDineros(dineros, scene) {
           monton.label = new Phaser.GameObjects.Text(
             scene, 
             monton.gameObject.x + monton.gameObject.width/2,
-            monton.gameObject.y - 50, // + monton.gameObject.height,
-            d.partido + "\nQ" + utils.formatMoney(Math.floor(d.value)), 
+            monton.gameObject.y - 150, // + monton.gameObject.height,
+            d.partido + "\nQ " + utils.formatMoney(Math.floor(d.value)), 
             utils.labelStyle
           );
           monton.label.setOrigin(0,0);
           monton.logo = new Phaser.GameObjects.Image(
             scene,
-            monton.label.x-50,
-            monton.gameObject.y - 40, //+ monton.gameObject.height,
+            monton.label.x-70,
+            monton.gameObject.y - 90, //+ monton.gameObject.height,
             d.logo_ref
           );
-          monton.logo.setDisplaySize(100,100);
+          monton.logo.setDisplaySize(140,140);
           that.container.add([monton.logo, monton.gameObject, monton.label]);
           monton.render();
+          
+          monton.onSelect = function () {
+              monton.label.setStyle(utils.labelSelStyle);
+              monton.logo.setDisplaySize(230,230);
+              monton.logo.x = monton.label.x-120;
+              
+              var newZoom = 0.7*data.viewport.height/Math.max(monton.gameObject.height,800);
+                
+              scene.cameras.main.zoomTo(newZoom, 500, Phaser.Math.Easing.Linear.In, true);
+              scene.cameras.main.pan(monton.gameObject.x + that.bounds.x + monton.gameObject.width/2, 
+                                      + monton.gameObject.y + monton.gameObject.height/2 + 100 + that.bounds.y, 500, Phaser.Math.Easing.Circular.Out, true);
+          };
+          
+          monton.onUnselect = function () {
+              monton.label.setStyle(utils.labelStyle);
+              monton.logo.setDisplaySize(140,140);
+              monton.logo.x = monton.label.x-70;
+          
+          };
+          
           return monton;
       });
+      
+  
+      var bounds = this.container.getBounds();
+    
+      this.container.y = -bounds.height;
+      this.label = new Phaser.GameObjects.Text(
+          scene, 
+          bounds.width / 2,
+          bounds.height + 50,
+          utils.yearsLabels[that.data.id], 
+          utils.titleStyle
+      );
+      this.label.setOrigin(0.5,0);
+      this.bounds = this.container.getBounds();
+      this.label.setScale(5);
+      this.container.add(this.label);
+      
+      this.onSelect = function () {
+          that.montones.forEach((i)=> { 
+              i.gameObject.setTint(0xffffff);
+              i.label.setVisible(true);
+              i.logo.x = i.label.x-90;
+              i.gameObject.setInteractive();
+              i.logo.setInteractive();
+          });
+          
+          var newZoom = 0.7*data.viewport.height/Math.max(that.bounds.height, 1800);
+          
+          scene.cameras.main.zoomTo(newZoom, 500, Phaser.Math.Easing.Linear.In, true);
+          scene.cameras.main.pan(that.bounds.x+that.bounds.width/2, -that.bounds.y - that.bounds.height, 500, Phaser.Math.Easing.Circular.Out, true);
+      };
+      
+      this.onUnselect = function () {
+          that.montones.forEach((i)=> { 
+              i.gameObject.setTint(0xcccccc);
+              i.label.setVisible(false);
+              i.logo.x = i.label.x;
+              i.gameObject.disableInteractive();
+              i.logo.disableInteractive();
+          });
+      };
+      
+      this.onUnselect();
       
       return this;
   }
@@ -153,12 +230,11 @@ var assets = {
   billete: null
 };
 
-function loader() {
-    var viewport = { width: 1000, height: 1000 };
+function loader(database, emitter) {
     var config = {
         type: Phaser.WEBGL,
-        width: viewport.width,
-        height: viewport.height,
+        width: data.viewport.width,
+        height: data.viewport.height,
         parent: 'game-container',
         scene: {
             preload: preload,
@@ -196,21 +272,20 @@ function loader() {
         assets.Q100 = this.add.image(100, 100, "billete100");
         assets.Q100.setVisible(false).setScale(0.3).setOrigin(0,0);
         assets.Q10000 = this.add.image(100, 100, "billete10000");
-        assets.Q10000.setVisible(false).setScale(0.28).setOrigin(0,0);
-
-        var database = Papa.parse("gte_financiamiento.csv", {
-            download: true,
-            complete: function (results, file) {
-                setDatabase(results.data);
-            }
-        });
+        assets.Q10000.setVisible(false).setScale(0.3).setOrigin(0,0);
         
 //         this.cameras.main.setRenderToTexture(this._utils.pipeline);
         
+        setDatabase(database);
+        
         data.scrolling = false;
+        data.scrollable = true;
         
         scene.input.on('pointerdown', function(pointer){
+            if (data.scrollable == false) return;
+            
             data.scrolling = true;
+            data.scrolled = false;
             data.scrollingOrigin = {x: pointer.x, y: pointer.y, camx: scene.cameras.main.scrollX, camy: scene.cameras.main.scrollY};
         });
         scene.input.on('pointerup', function(pointer){
@@ -223,10 +298,19 @@ function loader() {
                 var dy = pointer.y - data.scrollingOrigin.y;
                 scene.cameras.main.scrollX = (data.scrollingOrigin.camx - dx/scale);
                 scene.cameras.main.scrollY = (data.scrollingOrigin.camy - dy/scale);
+                
+                if (dx>10 || dy >10) {
+                    data.scrolled = true;
+                }
+                else {
+                    data.scrolled = false;
+                }
             }
         });
+        /*
         this.input.on('wheel', function (pointer, gameObjects, deltaX, deltaY, deltaZ) {
-
+            pointer.event.stopPropagation();
+            pointer.event.preventDefault();
             var newZoom = scene.cameras.main.zoom + deltaY * 0.001;
             if (newZoom < data.minZoom) 
                 newZoom = data.minZoom;
@@ -234,7 +318,9 @@ function loader() {
                 newZoom = data.maxZoom;
             scene.cameras.main.setZoom(newZoom);
         });
-        
+        */
+        this.game.input.mouse.capture = true;
+
     }
     
     function update ()
@@ -256,7 +342,6 @@ function loader() {
     
     function setDatabase(database) {
         // Agregar por período
-        window.database = database;
         var aggMain = {}, aggArray = [];
         // Columns: ["", "FECHA_APORTE", "AÑO", "MONTO_float", "PARTIDO", "NOMBRE_COMPLETO", "FILIACIÓN"]
         database.forEach(function (row, i) {
@@ -269,13 +354,13 @@ function loader() {
                 aggMain[periodo][row[4]] =  { 
                     value: 0, 
                     id: row[4],
+                    year: row[2],
                     logo_ref: "Partidos_" + partidosAbbr(row[4]),
                     partido: row[4]
                 };
             }
             aggMain[periodo][row[4]].value += parseFloat(row[3]) || 0;
         });
-        console.log(aggMain);
         // Plot
         var years =  Object.getOwnPropertyNames(aggMain).map(function (d) {
             return {
@@ -287,74 +372,110 @@ function loader() {
         });
         
         var prevYear = null;
-        var yearsLabels = {
-            0: "2007",
-            1: "2011",
-            2: "2015"
-        };
         var selYear = null;
         var maxHeight = 0, totalWidth = 0;
         var yearsMontones = years.map(function (d) {
-            if (!isNaN(d.id)) {
-                var plot = new PlotDineros(d.data, scene);
-                scene.add.existing(plot.container);
-                
-                if (prevYear != null) {
-                    var boundsPrev = prevYear.container.getBounds();
-                    plot.container.x = boundsPrev.width + boundsPrev.x + 400;
+            if (isNaN(d.id)) return null;
+                                      
+            var plot = new PlotDineros(d, scene);
+            scene.add.existing(plot.container);
+            
+            if (prevYear != null) {
+                var boundsPrev = prevYear.bounds;
+                plot.container.x = boundsPrev.width + boundsPrev.x + 400;
+                plot.bounds = plot.container.getBounds();
+            }
+            
+            if (maxHeight < plot.bounds.height) maxHeight = plot.bounds.height;
+            
+            totalWidth += plot.bounds.width;
+            
+            plot.container.setInteractive(new Phaser.Geom.Rectangle(0, 0, plot.bounds.width, plot.bounds.height), 
+                                          Phaser.Geom.Rectangle.Contains);
+            plot.container.on("pointerup", () => { emitter("select-ciclo", utils.yearsLabels[plot.data.id]); } );
+            plot.montones.forEach(function (m) {
+                m.logo.on("pointerup", () => { emitter("select-partido", m.data.partido); } );
+                m.gameObject.on("pointerup", () => { emitter("select-partido", m.data.partido); } );
+            });
+            
+            prevYear = plot;
+            return plot;
+        });
+        
+        function selectCiclo(plot) {
+            if (data.scrolled) return;
+            if (selYear) {
+                selYear.onUnselect();
+            }
+            if (plot) {
+                plot.onSelect();
+                data.scrollable = true;
+            }
+            else {
+                selYear = null;
+                selectPartido(null);
+                resetViewport(true);
+                data.scrollable = true;
+            }
+            selYear = plot;
+        }
+        
+        var selPartido = null;
+        function selectPartido(monton) {
+            if (data.scrolled) return;
+            else if (selYear) {
+                selYear.onSelect();
+            }
+            if (selPartido) {
+                selPartido.onUnselect();
+            }
+            selPartido = monton;
+            if (selPartido) {
+                selPartido.onSelect();
+            }
+        }
+        
+        scene.events.on("set-ciclo", function (val) {
+            var found = false;
+            yearsMontones.forEach((y) => {
+                if (utils.yearsLabels[y.data.id] == val) {
+                    selectCiclo(y);
+                    found = true
                 }
-                
-                var bounds = plot.container.getBounds();
-                
-                plot.container.y = -bounds.height;
-                plot.label = new Phaser.GameObjects.Text(
-                    scene, 
-                    bounds.width / 2,
-                    bounds.height + 50, // + monton.gameObject.height,
-                    yearsLabels[d.id], 
-                    utils.titleStyle
-                );
-                plot.label.setOrigin(0.5,0);
-                plot.container.add(plot.label);
-                
-                if (maxHeight < bounds.height) maxHeight = bounds.height;
-                totalWidth += bounds.width;
-                
-                // recalcular los bounds
-                bounds = plot.container.getBounds();
-                plot.container.setInteractive(new Phaser.Geom.Rectangle(0, 0, bounds.width, bounds.height), Phaser.Geom.Rectangle.Contains);
-                plot.container.on("pointerdown", function (pointer) {
-                    if (selYear == d.id) {
-                        selYear = null;
-                        resetViewport(true);
-                    }
-                    else {
-                        selYear = d.id;
-                        var newZoom = 0.7*viewport.height/bounds.height;
-                        scene.cameras.main.zoomTo(newZoom, 500, Phaser.Math.Easing.Linear.In, true);
-                        scene.cameras.main.pan(bounds.x+bounds.width/2, -bounds.height/2+300, 500, Phaser.Math.Easing.Circular.Out, true)
-                    }
-                });
-                
-                prevYear = plot;
-                return plot;
-            } 
+            });
+            if (!found) {
+                selectCiclo(null);
+            }
+        });
+        
+        scene.events.on("set-partido", function (val) {
+            if (!selYear) return;
+            var found = false;
+            selYear.montones.forEach((m) => {
+                if (m.data.partido == val) {
+                    selectPartido(m);
+                    found = true;
+                }
+            });
+            if (!found) {
+                selectPartido(null);
+            }
         });
         
         function resetViewport(ease) {
             if (ease) {
                 scene.cameras.main.pan(totalWidth/2+500, -maxHeight/2 + 200 + 500, 400, Phaser.Math.Easing.Linear.In, true);
-                scene.cameras.main.zoomTo(Math.min(0.75*viewport.width/totalWidth,
-                                                   0.75*viewport.height/(maxHeight+300),
+                scene.cameras.main.zoomTo(Math.min(0.75*data.viewport.width/totalWidth,
+                                                   0.75*data.viewport.height/(maxHeight+300),
                                                    0.5
                                                ),
                                                    400, Phaser.Math.Easing.Circular.Out, true);
             }
             else {
                 scene.cameras.main.setScroll(totalWidth/2, -maxHeight/2 + 200);
-                scene.cameras.main.setZoom(Math.min(0.75*viewport.width/totalWidth,
-                                                   0.75*viewport.height/(2*maxHeight + 300),
-                                                    0.5
+                scene.cameras.main.setZoom(Math.min(0.75*data.viewport.width/totalWidth,
+                                                   0.75*data.viewport.height/(2*maxHeight + 300),
+                                                    0.4
                                                ));
             }
         }
