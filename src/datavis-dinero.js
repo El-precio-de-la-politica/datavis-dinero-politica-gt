@@ -3,7 +3,7 @@ import { Blur } from "./graphics/blur"
 
 var data = {
   viewport: {
-      width: 1000, height: 1000
+      width: 900, height: 900
   },
   orig_largo: 202, 
   orig_ancho: 85, 
@@ -15,7 +15,8 @@ var data = {
   dy_B: 12/0.3,
   block_z_offset: 15, 
   minZoom: 0.1,
-  maxZoom: 1.3
+  maxZoom: 1.3,
+  zBlurThreshold: 0.5
   
 }
 
@@ -41,14 +42,7 @@ var utils = {
     },
     labelSelStyle: {
         font: '300 45px Rubik',
-        color: '#660025',
-        shadow: {
-            color: '#666666',
-            fill: true,
-            offsetX: 0,
-            offsetY: 0,
-            blur: 5
-        },
+        color: '#660025', 
         padding: {x: 20, y: 10}
     },
     titleStyle: {
@@ -92,7 +86,8 @@ function CuboDeDinero(N, scene, x, y) {
     this.gameObject = new Phaser.GameObjects.RenderTexture(scene, x, y, ancho, alto);
     this.graphics = scene.add.graphics().setVisible(false);
 
-    this.render = function () {
+    this.render = function (z) {
+        this.gameObject.clear();
         for (var x = 1; x <= final_x; x++) {
             for (var y = final_y; y >= 1; y--) {
                 for (var z = final_z; z >= 1; z--) {
@@ -104,7 +99,7 @@ function CuboDeDinero(N, scene, x, y) {
                             tx = ix + data.iso_basis_x.dot(xyvector);
                         
                         this.gameObject .draw(
-                            assets.Q10000, tx, ty);
+                            (z&&z<data.zBlurThreshold)? assets.Q10000Blur:assets.Q10000 , tx, ty);
                     }
                 }
             }
@@ -213,7 +208,7 @@ function PlotDineros(dineros, scene) {
       
       this.onUnselect = function () {
           that.montones.forEach((i)=> { 
-              i.gameObject.setTint(0xcccccc);
+             // i.gameObject.setTint(0xcccccc);
               i.label.setVisible(false);
               i.logo.x = i.label.x;
               i.gameObject.disableInteractive();
@@ -243,7 +238,13 @@ function loader(database, emitter) {
         backgroundColor: 'rgb(255, 255, 255)',
         render: {
           antialias: true
-        }
+        },
+        scale: {
+          mode: Phaser.Scale.FIT,
+          parent: 'game-container',
+          width: data.viewport.width,
+          height: data.viewport.height
+        },
     };
     
     var montonA;
@@ -253,6 +254,7 @@ function loader(database, emitter) {
     {
         this.load.image('billete100', 'assets/Assets/Q100_Iso.png');
         this.load.image('billete10000', 'assets/Assets/Q100_Block.png');
+        this.load.image('billete10000_blur', 'assets/Assets/Q100_Block_blur.png');
         
         var partidos = "Partidos_ADN, Partidos_FCN, Partidos_MI PAIS, Partidos_UNE, Partidos_VAMOS, Partidos_ANN, Partidos_FRG, Partidos_PAN, Partidos_UNIONISTA, Partidos_VICTORIA, Partidos_CREO, Partidos_LIDER, Partidos_PATRIOTA, Partidos_URNG, Partidos_WINAQ"
         partidos.split(", ").forEach( (partido)=> {
@@ -269,10 +271,10 @@ function loader(database, emitter) {
     function create ()
     {
         scene = this;
-        assets.Q100 = this.add.image(100, 100, "billete100");
-        assets.Q100.setVisible(false).setScale(0.3).setOrigin(0,0);
         assets.Q10000 = this.add.image(100, 100, "billete10000");
-        assets.Q10000.setVisible(false).setScale(0.3).setOrigin(0,0);
+        assets.Q10000.setVisible(false).setScale(0.72).setOrigin(0,0);
+        assets.Q10000Blur = this.add.image(100, 100, "billete10000_blur");
+        assets.Q10000Blur.setVisible(false).setScale(0.75).setOrigin(0,0);
         
 //         this.cameras.main.setRenderToTexture(this._utils.pipeline);
         
@@ -392,8 +394,12 @@ function loader(database, emitter) {
             
             plot.container.setInteractive(new Phaser.Geom.Rectangle(0, 0, plot.bounds.width, plot.bounds.height), 
                                           Phaser.Geom.Rectangle.Contains);
-            plot.container.on("pointerup", () => { emitter("select-ciclo", utils.yearsLabels[plot.data.id]); } );
+            plot.container.on("pointerup", () => { 
+                if (data.scrolled) return;
+                emitter("select-ciclo", utils.yearsLabels[plot.data.id]);  
+            });
             plot.montones.forEach(function (m) {
+                if (data.scrolled) return;
                 m.logo.on("pointerup", () => { emitter("select-partido", m.data.partido); } );
                 m.gameObject.on("pointerup", () => { emitter("select-partido", m.data.partido); } );
             });
@@ -403,27 +409,22 @@ function loader(database, emitter) {
         });
         
         function selectCiclo(plot) {
-            if (data.scrolled) return;
             if (selYear) {
                 selYear.onUnselect();
             }
-            if (plot) {
+            selYear = plot;
+            if (selYear) {
                 plot.onSelect();
-                data.scrollable = true;
             }
             else {
-                selYear = null;
                 selectPartido(null);
                 resetViewport(true);
-                data.scrollable = true;
             }
-            selYear = plot;
         }
         
         var selPartido = null;
         function selectPartido(monton) {
-            if (data.scrolled) return;
-            else if (selYear) {
+            if (selYear) {
                 selYear.onSelect();
             }
             if (selPartido) {
@@ -440,7 +441,8 @@ function loader(database, emitter) {
             yearsMontones.forEach((y) => {
                 if (utils.yearsLabels[y.data.id] == val) {
                     selectCiclo(y);
-                    found = true
+                    found = true;
+                    scene.game.canvas.classList.add("sharper");
                 }
             });
             if (!found) {
@@ -455,6 +457,7 @@ function loader(database, emitter) {
                 if (m.data.partido == val) {
                     selectPartido(m);
                     found = true;
+                    scene.game.canvas.classList.add("sharper");
                 }
             });
             if (!found) {
@@ -478,6 +481,7 @@ function loader(database, emitter) {
                                                     0.4
                                                ));
             }
+            scene.game.canvas.classList.remove("sharper");
         }
         
         resetViewport();
