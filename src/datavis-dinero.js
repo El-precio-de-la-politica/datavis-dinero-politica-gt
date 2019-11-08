@@ -27,11 +27,6 @@ data["iso_basis_x"] = new Phaser.Math.Vector2(Math.cos(data.iso_angle_x), Math.c
 
 var utils = {
     rnd: new Phaser.Math.RandomDataGenerator(0),
-    yearsLabels: {
-        0: "2007",
-        1: "2011",
-        2: "2015"
-    },
     labelStyle: {
         font: '300 40px Rubik',
         fontWeight: "300",
@@ -162,7 +157,7 @@ function PlotDineros(dineros, scene) {
                 
               scene.cameras.main.zoomTo(newZoom, 500, Phaser.Math.Easing.Linear.In, true);
               scene.cameras.main.pan(monton.gameObject.x + that.bounds.x + monton.gameObject.width/2, 
-                                      + monton.gameObject.y + monton.gameObject.height/2 + 100 + that.bounds.y, 500, Phaser.Math.Easing.Circular.Out, true);
+                                      + monton.gameObject.y + monton.gameObject.height/2 + that.bounds.y, 500, Phaser.Math.Easing.Circular.Out, true);
           };
           
           monton.onUnselect = function () {
@@ -183,7 +178,7 @@ function PlotDineros(dineros, scene) {
           scene, 
           bounds.width / 2,
           bounds.height + 50,
-          utils.yearsLabels[that.data.id], 
+          that.data.year, 
           utils.titleStyle
       );
       this.label.setOrigin(0.5,0);
@@ -201,9 +196,9 @@ function PlotDineros(dineros, scene) {
           });
           
           var newZoom = 0.7*data.viewport.height/Math.max(that.bounds.height, 1800);
-          
           scene.cameras.main.zoomTo(newZoom, 500, Phaser.Math.Easing.Linear.In, true);
-          scene.cameras.main.pan(that.bounds.x+that.bounds.width/2, -that.bounds.y - that.bounds.height, 500, Phaser.Math.Easing.Circular.Out, true);
+          scene.cameras.main.pan(that.bounds.x+that.bounds.width/2, that.bounds.y + that.bounds.height/2, 
+                                 500, Phaser.Math.Easing.Circular.Out, true);
       };
       
       this.onUnselect = function () {
@@ -256,16 +251,14 @@ function loader(database, emitter) {
         this.load.image('billete10000', 'assets/Assets/Q100_Block.png');
         this.load.image('billete10000_blur', 'assets/Assets/Q100_Block_blur.png');
         
-        var partidos = "Partidos_ADN, Partidos_FCN, Partidos_MI PAIS, Partidos_UNE, Partidos_VAMOS, Partidos_ANN, Partidos_FRG, Partidos_PAN, Partidos_UNIONISTA, Partidos_VICTORIA, Partidos_CREO, Partidos_LIDER, Partidos_PATRIOTA, Partidos_URNG, Partidos_WINAQ"
+        var partidos = "Partidos_ADN, Partidos_FCN, Partidos_MI PAIS, Partidos_UNE, Partidos_VAMOS, Partidos_ANN, Partidos_FRG, Partidos_PAN, Partidos_UNIONISTA, Partidos_VICTORIA, Partidos_CREO, Partidos_LIDER, Partidos_PATRIOTA, Partidos_URNG, Partidos_WINAQ, Partidos_null"
         partidos.split(", ").forEach( (partido)=> {
             this.load.image(partido, 'assets/Partidos/' + partido + '.png');
         });
-        this._utils = {};
-        this._utils.pipeline = this.game.renderer.addPipeline('Blur', new Blur(this.game));
-        this._utils.pipeline .setFloat1('resolution', 2000);
-        this._utils.pipeline .setFloat1('radius', 1);
-        this._utils.pipeline .setFloat2('dir', 1.0, 1.0);
-
+        
+        this.load.on('complete', function () {
+            emitter("loaded", true);
+        });
     }
 
     function create ()
@@ -336,7 +329,16 @@ function loader(database, emitter) {
         "Lider": "LIDER",
         "URNG MAIZ": "URNG",
         "Winaq": "WINAQ",
-        "Victoria": "VICTORIA"
+        "Victoria": "VICTORIA",
+        "COMPROMISO RENOVACION Y ORDEN": "CREO",
+        "ENCUENTRO POR GUATEMALA": "EG",
+        "GRAN ALIANZA NACIONAL -GANA-": "GANA",
+        "BIENESTAR NACIONAL, BIEN": "BIEN",
+        "BIENESTAR NACIONAL": "BIEN",
+        "FRENTE DE CONVERGENCIA NACIONAL FCN-NACION": "FCN",
+        "PARTIDO DE AVANZADA NACIONAL": "PAN",
+        "PARTIDO HUMANISTA DE GUATEMALA": "PARTIDO HUMANISTA"
+        
     };
     function partidosAbbr(inputStr) {
         return _partidosAbbr[inputStr] || inputStr;
@@ -353,12 +355,17 @@ function loader(database, emitter) {
                 aggMain[periodo] = {};
             }
             if (aggMain[periodo][row[4]]  === undefined) {
+                var logo_ref = "Partidos_" + partidosAbbr(row[4])
+                if (!scene.textures.exists(logo_ref)) {
+                    logo_ref = "Partidos_null";
+                }
                 aggMain[periodo][row[4]] =  { 
                     value: 0, 
                     id: row[4],
                     year: row[2],
-                    logo_ref: "Partidos_" + partidosAbbr(row[4]),
-                    partido: row[4]
+                    logo_ref: logo_ref,
+                    partido: partidosAbbr(row[4]),
+                    partidoFull: row[4]
                 };
             }
             aggMain[periodo][row[4]].value += parseFloat(row[3]) || 0;
@@ -367,11 +374,13 @@ function loader(database, emitter) {
         var years =  Object.getOwnPropertyNames(aggMain).map(function (d) {
             return {
                 "id": d, 
+                "year": d*4+2007,
                 "data": Object.getOwnPropertyNames(aggMain[d]).map(function (f) {
                     return aggMain[d][f];
                 }).sort(function (a, b) { return - a.value + b.value; } )
             }
         });
+        
         
         var prevYear = null;
         var selYear = null;
@@ -396,12 +405,12 @@ function loader(database, emitter) {
                                           Phaser.Geom.Rectangle.Contains);
             plot.container.on("pointerup", () => { 
                 if (data.scrolled) return;
-                emitter("select-ciclo", utils.yearsLabels[plot.data.id]);  
+                emitter("select-ciclo", plot.data.year);  
             });
             plot.montones.forEach(function (m) {
                 if (data.scrolled) return;
-                m.logo.on("pointerup", () => { emitter("select-partido", m.data.partido); } );
-                m.gameObject.on("pointerup", () => { emitter("select-partido", m.data.partido); } );
+                m.logo.on("pointerup", () => { emitter("select-partido", m.data.partidoFull); } );
+                m.gameObject.on("pointerup", () => { emitter("select-partido", m.data.partidoFull); } );
             });
             
             prevYear = plot;
@@ -439,7 +448,7 @@ function loader(database, emitter) {
         scene.events.on("set-ciclo", function (val) {
             var found = false;
             yearsMontones.forEach((y) => {
-                if (utils.yearsLabels[y.data.id] == val) {
+                if (y.data.year == val) {
                     selectCiclo(y);
                     found = true;
                     scene.game.canvas.classList.add("sharper");
@@ -454,7 +463,7 @@ function loader(database, emitter) {
             if (!selYear) return;
             var found = false;
             selYear.montones.forEach((m) => {
-                if (m.data.partido == val) {
+                if (m.data.partidoFull == val) {
                     selectPartido(m);
                     found = true;
                     scene.game.canvas.classList.add("sharper");

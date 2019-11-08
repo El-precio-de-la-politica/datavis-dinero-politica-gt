@@ -2,7 +2,7 @@
   <div id="main-container">
       <div class="header">
         <div class="inner">
-          <img clas="logo" src="assets/Branding/Logo_Square_Ochre.png" />
+          <img class="logo" src="assets/Branding/Logo_Square_Ochre.png" />
           <div class="nav-breadcrumbs">
               <span class="btn select-msg" v-if="ciclo != null" @click="resetSels()">Volver </span>
               <span class="btn select-msg" v-if="ciclo == null">Selecciona un año</span>
@@ -12,19 +12,32 @@
           </div>
         </div>
       </div>
-      <div id="game-container"></div>
+      <div class="loading-db" v-if="!loadedVis">
+        <Loader />
+      </div>
+      <div id="game-wrapper"> 
+        <div id="game-container"></div>
+      </div>
       <div :class="{'ver-mas': true, 'esconder': scrollTriggers.segundaparte}"><a class="btn low" href="#detalles">¿Quiénes dieron más?</a><br> <i class="fa fa-chevron-circle-down"></i></div>
       <div id="segundaparte" class="segunda-parte scroll-trigger">
           <div id="detalles"></div>
           <div v-if="partido" class="info-partido">
-              <div v-if="!info[ciclo][partido]">
+              <div v-if="!partidoData">
                   <div class="vacio">Partido sin información</div>
               </div>
-              <div v-if="info[ciclo][partido]" class="partido-img">
-                  <img class="avatar" :src="info[ciclo][partido].avatar" >
-                  <h2>{{partido}}</h2>
-                  <h3>{{info[ciclo][partido].candidato}}</h3>
-                  <img class="partido-logo" :src="info[ciclo][partido].logo" >
+              <div v-if="partidoData">
+                <div class="partido-img">
+                    <img class="avatar" :src="partidoData.Foto" >
+                    <h2>{{partidoData.Partido_nombre}}</h2>
+                    <h3>{{partidoData.Presidenciable}}</h3>
+                    <img class="partido-logo" :src="partidoData.Logo" >
+                </div>
+                <div class="partido-detalles">
+                    <div class="item" v-if="partidoData.Trayectoria_Presi">{{partidoData.Trayectoria_Presi}}</div>
+                    <div class="item" v-if="partidoData.Vicepresidenciable">Vicepresidenciable: {{partidoData.Vicepresidenciable}}</div>
+                    <div class="item" v-if="partidoData.Trayectoria_Vice">{{partidoData.Trayectoria_Vice}}</div>
+                    <div class="item" v-if="partidoData.Explicativo">{{partidoData.Explicativo}}</div>
+                </div>
               </div>
           </div>
           <div :class="{ 'top-financistas': true, 'sel-partido': partido!=null}">
@@ -47,7 +60,10 @@
 
 <script>
 import Vue from 'vue'
+import Loader from './Loader.vue'
 import Papa from "papaparse"
+import 'whatwg-fetch'
+
 
 import * as dinero from './datavis-dinero'
 
@@ -55,62 +71,21 @@ var scroll = null;
 
 export default {
   components: {
+    Loader
   },
   data() {
     return {
       content: {
       },
       filtroTop: "",
+      loadedVis: false,
       database: [],
       partido: null,
       ciclo: null,
       lastScrollPosition: 0,
       scrollTriggers: {},
-      
-      info: {
-              2007: {
-                  "UNE": {
-                      avatar: "assets/Avatars/anonimo.png",
-                      candidato: "Alvaro Colom",
-                      logo: "assets/Partidos/Partidos_UNE.png"
-                  },
-                  "Patriota": {
-                      avatar: "assets/Avatars/OttoPerez-01.png",
-                      candidato: "Otto Perez Molina",
-                      logo: "assets/Partidos/Partidos_PATRIOTA.png"
-                  }
-              },
-              2011: {
-                  "Patriota": {
-                      avatar: "assets/Avatars/OttoPerez-01.png",
-                      candidato: "Otto Perez Molina",
-                      logo: "assets/Partidos/Partidos_PATRIOTA.png"
-                  },
-                  "Lider": {
-                      avatar: "assets/Avatars/ManuelBaldizon-01.png" ,
-                      candidato: "Manuel Baldizón",
-                      logo: "assets/Partidos/Partidos_LIDER.png"
-                  }
-              },
-              2015: {
-                  "FCN": {
-                      avatar: "assets/Avatars/JimmyMorales-01.png",
-                      candidato: "Jimmy Morales",
-                      logo: "assets/Partidos/Partidos_FCN.png"
-                  },
-                  "UNE": {
-                      avatar: "assets/Avatars/SandraTorres-01.png",
-                      candidato: "Sandra Torres",
-                      logo: "assets/Partidos/Partidos_UNE.png"
-                  },
-                  "Lider": {
-                      avatar: "assets/Avatars/ManuelBaldizon-01.png" ,
-                      candidato: "Manuel Baldizón",
-                      logo: "assets/Partidos/Partidos_LIDER.png"
-                  }
-              }
-          }
-    };
+      dataPartidos: []
+    };  
   },
   methods: {
       onScroll () {
@@ -175,15 +150,13 @@ export default {
           
           if (this.ciclo!=null) {
               var filtro = this.ciclo;
-              console.log(filtro);
               processedData = processedData.filter((i)=> {
-                  return +i[2] == +filtro;
+                  return +i[2] <= +filtro && +i[2] >= +filtro-4;
               });
           }
           
           if (this.partido!=null) {
               var filtro = this.partido;
-              console.log(filtro);
               processedData = processedData.filter((i)=> {
                   return i[4] == filtro;
               });
@@ -191,17 +164,37 @@ export default {
           
           
           return processedData.slice(0,40);
+      },
+      partidoData() {
+          var foundd = null;
+          var that = this;
+          if (this.partido == null) return null;
+          console.log(this.dataPartidos, this.partido, this.ciclo);
+          this.dataPartidos.forEach( function (d, i) {
+              if ( d.Partido_id == that.partido && d.Year == that.ciclo)
+                  foundd = d;
+          });
+          console.log(foundd);
+          return foundd;
       }
   },
 
   async mounted() {
       window.addEventListener('scroll', this.onScroll)
       var that = this;
+      fetch('data_partidos.json')
+        .then(function(response) {
+          return response.json()
+        }).then(function(json) {
+          Vue.set(that, "dataPartidos", json);
+        }).catch(function(ex) {
+          console.log('No se pudo cargar la información de los partidos', ex)
+        });
       var database = Papa.parse("gte_financiamiento.csv", {
             download: true,
             complete: function (results, file) {
                 results.data = results.data.filter((i) => {
-                    return i[3] > 0;
+                    return i[3] > 0 && i[2]>2007;
                 });
                 results.data = results.data.map((i) => {
                     i[3] = parseFloat(i[3]);
@@ -226,6 +219,9 @@ export default {
           that.partido = data;
           scroll.animateScroll(0);
       });
+      this.$on("loaded", (loaded) => {
+          that.loadedVis = loaded;
+      });
       
       scroll = new SmoothScroll('a[href*="#"]');
 
@@ -249,11 +245,22 @@ export default {
 
 <style>
 body {
+		padding: 0px;
     margin: 0px;
     padding-top: 60px;
     font-family: 'Rubik', sans-serif;
     scroll-behavior: smooth;
 }
+
+.loading-db {
+    text-align: center;
+    position: absolute;
+    width: 100%;
+    top: 400px;
+    left: 0px;
+    z-index: 5;
+}
+
 .esconder {
     display: none;
 }
@@ -262,8 +269,8 @@ a {
     color: inherit;
 }
 .ver-mas {
-    position: fixed;
-    bottom: 70px;
+    position: absolute;
+    top: 700px;
     width: 100%;
     text-align: center;
     z-index: 3;
@@ -296,12 +303,18 @@ a {
 }
 
 .header .logo {
-    height: 30px;
+    height: 70px;
+    margin-left: 30px;
+    margin-top: 10px;
 }
 
 .segunda-parte {
     position:relative;
     z-index: 1;
+}
+
+#game-wrapper {
+		height: 900px;
 }
 
 #game-container, .segunda-parte {
@@ -342,21 +355,21 @@ a {
 .btn.low {
     background: #705104;
 }
-.segunda-parte {
-    padding: 30px;
+.top-financistas, .info-partido {
+    margin: 0px 5%;
 }
 .info-partido {
     float: left;
-    width: 48%;
+    width: 40%;
 }
 .partido-img {
     position: relative;
 }
 .info-partido .partido-logo {
     position: absolute;
-    right: 50px;
-    bottom: 50px;
-    height: 130px;
+    right: 60px;
+    bottom: 60px;
+    height: 100px;
 }
 
 #detalles {
@@ -380,7 +393,7 @@ h2 {
     text-align: right;
 }
 .top-financistas.sel-partido {
-    width: 50%;
+    width: 45%;
     margin-left: 50%;
 }
 
@@ -415,7 +428,7 @@ h2 {
     padding: 5px 10px;
     font-size: 15px;
     color: #660025;
-    max-width: 180px;
+    max-width: 150px;
     display: inline-block;
     margin: 10px;
     position: relative;
@@ -426,8 +439,9 @@ h2 {
 .financista .partido {
     display: block;
     font-weight: 500;
-    text-transform: uppercase;
+   /* text-transform: uppercase;*/
     font-size: 12px;
+    text-transform: none;
 }
 .financista .fecha {
     display: block;
